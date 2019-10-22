@@ -14,7 +14,7 @@ import cv2
 import matplotlib.pyplot as plt
 
 use_GPU = torch.cuda.is_available()
-
+print('Cuda', use_GPU)
 """
 Variable
 """
@@ -25,35 +25,41 @@ class_num = 2
 """
 Load datasets
 """
-train_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/train', transform=transforms.Compose([transforms.ToTensor(),
+train_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/train',
+                                                   transform=transforms.Compose([
+                                                    transforms.Resize((sz, sz)),
+                                                    transforms.RandomHorizontalFlip(),
+                                                    transforms.ColorJitter(0.1, 0.1, 0.1, 0.01),
+                                                    transforms.RandomRotation(20),
+                                                    transforms.ToTensor(),
+                                                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                                            ]))
+
+val_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/val', transform=transforms.Compose([
                                                                                                         transforms.Resize((sz,sz)),
-                                                                                                        transforms.RandomHorizontalFlip(),
-                                                                                                        transforms.ColorJitter(0.1,0.1,0.1,0.1),
+                                                                                                        transforms.ToTensor(),
                                                                                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ]))
 
-val_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/val', transform=transforms.Compose([transforms.ToTensor(),
+test_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/val', transform=transforms.Compose([
                                                                                                         transforms.Resize((sz,sz)),
+                                                                                                        transforms.ToTensor(),
                                                                                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ]))
 
-test_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/val', transform=transforms.Compose([transforms.ToTensor(),
-                                                                                                        transforms.Resize((sz,sz)),
-                                                                                                        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-]))
-
-num_of_pic = 1
-for i in range(num_of_pic):
-    data_dir = ('D:/pro/data/Cat&Dog/train/Cat/cat.%d.jpg' %i)
-    plt.figure(figsize=(16,16))
-    plt.subplot(num_of_pic,1,i+1)
-    img = plt.imread(data_dir)
-    cv2.imshow("Pic", img)
-    cv2.waitKey(500)
+num_of_pic = 0
+if num_of_pic > 0:
+    for i in range(num_of_pic):
+        data_dir = ('D:/pro/data/Cat&Dog/train/Cat/cat.%d.jpg' %i)
+        plt.figure(figsize=(16,16))
+        plt.subplot(num_of_pic,1,i+1)
+        img = plt.imread(data_dir)
+        cv2.imshow("Pic", img)
+        cv2.waitKey(500)
 
 train_DL = torch.utils.data.DataLoader(dataset=train_datasets, batch_size=bs, shuffle=True)
-val_DL = torch.utils.data.DataLoader(val_datasets, batch_size=bs, shuffle=True)
-test_DL = torch.utils.data.DataLoader(test_datasets, batch_size=bs, shuffle=True)
+val_DL = torch.utils.data.DataLoader(dataset=val_datasets, batch_size=bs, shuffle=True)
+test_DL = torch.utils.data.DataLoader(dataset=test_datasets, batch_size=bs, shuffle=True)
 
 """
 Model
@@ -71,13 +77,19 @@ class SimpleCNN(nn.Module):
                                     nn.ReLU(),
                                     nn.MaxPool2d(2,2)
         )
-        self.fc = nn.Linear(57*57*32, class_num)
+        self.layer3 = nn.Sequential(nn.Conv2d(32,64,3,1,2),
+                                    nn.BatchNorm2d(64),
+                                    nn.ReLU(),
+                                    nn.MaxPool2d(2,2)
+        )
+        self.fc = nn.Linear(29*29*64, class_num)
 
     def forward(self, x):
         out1 = self.layer1(x)
         out2 = self.layer2(out1)
-        out2 = out2.reshape(out2.size(0), -1)
-        y = self.fc(out2)
+        out3 = self.layer3(out2)
+        out3 = out3.reshape(out3.size(0), -1)
+        y = self.fc(out3)
         return y
 
 
@@ -89,12 +101,12 @@ if use_GPU:
 """
 Loss
 """
-loss = nn.CrossEntropyLoss()
+loss_t = nn.CrossEntropyLoss()
 
 """
 optim
 """
-optimizer = optim.SGD(model.parameters(), lr=0.002, momentum=0.9)
+optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
 
 def to_var(x, volatile=False):
@@ -119,7 +131,7 @@ for epoch in range(num_epochs):
         outputs = model(inputs)
 
         # Loss
-        loss = loss(outputs, targets)
+        loss = loss_t(outputs, targets)
         losses +=[loss.data.item()]
 
         # backward pass
@@ -132,3 +144,31 @@ for epoch in range(num_epochs):
             print('Train, Epoch [%2d/%2d], Step [%3d/%3d], Loss: %.4f'
                   % (epoch + 1, num_epochs, i + 1, len(train_DL), loss.data.item()))
 
+
+    model.eval()
+    corrects = 0
+    for k, (inputs, targets) in enumerate(val_DL):
+
+        inputs = to_var(inputs)
+        targets = to_var(targets)
+
+        outputs = model(inputs)
+        loss_val = loss_t(outputs, targets)
+        predicted = torch.argmax(outputs, 1)
+        corrects += torch.sum(predicted == targets)
+        if (k + 1) % 10 == 0:
+            print("Validation,  Step [{},{}] Loss {:.4f}  Acc {:.4f} "
+                  .format(k + 1, len(val_DL), loss_val.item(), 100 * corrects/((k + 1) * bs)))
+
+corrects = 0
+for j, (inputs, targets) in enumerate(test_DL):
+
+    inputs = to_var(inputs)
+    targets = to_var(targets)
+
+    outputs = model(inputs)
+    predicted = torch.argmax(outputs, 1)
+    corrects += torch.sum(predicted==targets)
+    if (j + 1) % 10 == 0:
+        print("Test,  Step [{},{}] Acc {:.4f} "
+              .format(j + 1, len(test_DL), 100 * corrects / ((j + 1) * bs)))
