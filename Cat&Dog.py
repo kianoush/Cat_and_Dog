@@ -8,6 +8,8 @@ import torch
 import torch.nn as nn
 import torchvision
 from torchvision.transforms import transforms
+from torch.autograd import Variable
+import torch.optim as optim
 import cv2
 import matplotlib.pyplot as plt
 
@@ -40,7 +42,7 @@ test_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/val', tran
                                                                                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ]))
 
-num_of_pic = 10
+num_of_pic = 1
 for i in range(num_of_pic):
     data_dir = ('D:/pro/data/Cat&Dog/train/Cat/cat.%d.jpg' %i)
     plt.figure(figsize=(16,16))
@@ -49,7 +51,7 @@ for i in range(num_of_pic):
     cv2.imshow("Pic", img)
     cv2.waitKey(500)
 
-train_DL = torch.utils.data.DataLoader(train_datasets, batch_size=bs, shuffle=True)
+train_DL = torch.utils.data.DataLoader(dataset=train_datasets, batch_size=bs, shuffle=True)
 val_DL = torch.utils.data.DataLoader(val_datasets, batch_size=bs, shuffle=True)
 test_DL = torch.utils.data.DataLoader(test_datasets, batch_size=bs, shuffle=True)
 
@@ -70,7 +72,8 @@ class SimpleCNN(nn.Module):
                                     nn.MaxPool2d(2,2)
         )
         self.fc = nn.Linear(57*57*32, class_num)
-    def forward(self,x):
+
+    def forward(self, x):
         out1 = self.layer1(x)
         out2 = self.layer2(out1)
         out2 = out2.reshape(out2.size(0), -1)
@@ -78,7 +81,10 @@ class SimpleCNN(nn.Module):
         return y
 
 
-model = SimpleCNN
+model = SimpleCNN()
+
+if use_GPU:
+    model = model.cuda()
 
 """
 Loss
@@ -88,15 +94,41 @@ loss = nn.CrossEntropyLoss()
 """
 optim
 """
-optimaizer = torch.optim.SGD(SimpleCNN.parameters(), lr=0.001, momentum=0.9)
+optimizer = optim.SGD(model.parameters(), lr=0.002, momentum=0.9)
 
-if use_GPU:
-    model = SimpleCNN.cuda
 
 def to_var(x, volatile=False):
-    if torch.cuda.is_available():
+    if use_GPU:
         x = x.cuda()
     return Variable(x, volatile=volatile)
 
+"""
+Main Loop
+"""
+num_epochs = 10
+losses = []
+for epoch in range(num_epochs):
+    model.train()
+    for i, (inputs, targets) in enumerate(train_DL):
 
+        inputs = to_var(inputs)
+        targets = to_var(targets)
+
+        # forward
+        optimizer.zero_grad()
+        outputs = model(inputs)
+
+        # Loss
+        loss = loss(outputs, targets)
+        losses +=[loss.data.item()]
+
+        # backward pass
+        loss.backward()
+
+        # update parameters
+        optimizer.step()
+
+        if (i+1) % 50==0:
+            print('Train, Epoch [%2d/%2d], Step [%3d/%3d], Loss: %.4f'
+                  % (epoch + 1, num_epochs, i + 1, len(train_DL), loss.data.item()))
 
