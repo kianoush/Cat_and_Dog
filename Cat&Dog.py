@@ -11,16 +11,18 @@ from torchvision.transforms import transforms
 import cv2
 import matplotlib.pyplot as plt
 
+use_GPU = torch.cuda.is_available()
+
 """
 Variable
 """
 sz = 224
 bs = 32
 class_num = 2
+
 """
 Load datasets
 """
-
 train_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/train', transform=transforms.Compose([transforms.ToTensor(),
                                                                                                         transforms.Resize((sz,sz)),
                                                                                                         transforms.RandomHorizontalFlip(),
@@ -72,3 +74,29 @@ class SimpleCNN(nn.Module):
         out1 = self.layer1(x)
         out2 = self.layer2(out1)
         out2 = out2.reshape(out2.size(0), -1)
+        y = self.fc(out2)
+        return y
+
+
+model = SimpleCNN
+
+"""
+Loss
+"""
+loss = nn.CrossEntropyLoss()
+
+"""
+optim
+"""
+optimaizer = torch.optim.SGD(SimpleCNN.parameters(), lr=0.001, momentum=0.9)
+
+if use_GPU:
+    model = SimpleCNN.cuda
+
+def to_var(x, volatile=False):
+    if torch.cuda.is_available():
+        x = x.cuda()
+    return Variable(x, volatile=volatile)
+
+
+
