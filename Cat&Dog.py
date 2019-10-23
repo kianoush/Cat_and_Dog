@@ -15,11 +15,22 @@ import matplotlib.pyplot as plt
 
 use_GPU = torch.cuda.is_available()
 print('Cuda', use_GPU)
+
+num_of_pic = 0
+if num_of_pic > 0:
+    for i in range(num_of_pic):
+        data_dir = ('D:/pro/data/Cat&Dog/train/Cat/cat.%d.jpg' %i)
+        plt.figure(figsize=(16,16))
+        plt.subplot(num_of_pic,1,i+1)
+        img = plt.imread(data_dir)
+        cv2.imshow("Pic", img)
+        cv2.waitKey(500)
+
 """
 Variable
 """
 sz = 224
-bs = 32
+bs = 64
 class_num = 2
 
 """
@@ -47,15 +58,6 @@ test_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/val', tran
                                                                                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ]))
 
-num_of_pic = 0
-if num_of_pic > 0:
-    for i in range(num_of_pic):
-        data_dir = ('D:/pro/data/Cat&Dog/train/Cat/cat.%d.jpg' %i)
-        plt.figure(figsize=(16,16))
-        plt.subplot(num_of_pic,1,i+1)
-        img = plt.imread(data_dir)
-        cv2.imshow("Pic", img)
-        cv2.waitKey(500)
 
 train_DL = torch.utils.data.DataLoader(dataset=train_datasets, batch_size=bs, shuffle=True)
 val_DL = torch.utils.data.DataLoader(dataset=val_datasets, batch_size=bs, shuffle=True)
@@ -67,8 +69,8 @@ Model
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
-        self.layer1 = nn.Sequential(nn.Conv2d(3,16,3,1,2),
-                                    nn.BatchNorm2d(16),
+        self.layer1 = nn.Sequential(nn.Conv2d(3,8,3,1,2),
+                                    nn.BatchNorm2d(8),
                                     nn.ReLU(),
                                     nn.MaxPool2d(2,2)
         )
@@ -82,14 +84,14 @@ class SimpleCNN(nn.Module):
                                     nn.ReLU(),
                                     nn.MaxPool2d(2,2)
         )
-        self.fc = nn.Linear(29*29*64, class_num)
+        self.fc = nn.Linear(113*113*8, class_num)
 
     def forward(self, x):
         out1 = self.layer1(x)
-        out2 = self.layer2(out1)
-        out3 = self.layer3(out2)
-        out3 = out3.reshape(out3.size(0), -1)
-        y = self.fc(out3)
+        #out2 = self.layer2(out1)
+        #out3 = self.layer3(out2)
+        out1 = out1.reshape(out1.size(0), -1)
+        y = self.fc(out1)
         return y
 
 
@@ -144,7 +146,6 @@ for epoch in range(num_epochs):
             print('Train, Epoch [%2d/%2d], Step [%3d/%3d], Loss: %.4f'
                   % (epoch + 1, num_epochs, i + 1, len(train_DL), loss.data.item()))
 
-
     model.eval()
     corrects = 0
     for k, (inputs, targets) in enumerate(val_DL):
@@ -159,6 +160,10 @@ for epoch in range(num_epochs):
         if (k + 1) % 10 == 0:
             print("Validation,  Step [{},{}] Loss {:.4f}  Acc {:.4f} "
                   .format(k + 1, len(val_DL), loss_val.item(), 100 * corrects/((k + 1) * bs)))
+
+plt.figure(figsize=(12, 4))
+plt.plot(losses)
+plt.show()
 
 corrects = 0
 for j, (inputs, targets) in enumerate(test_DL):
