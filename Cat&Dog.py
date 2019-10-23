@@ -31,7 +31,7 @@ if num_of_pic > 0:
 Variable
 """
 sz = 224
-bs = 64
+bs = 32
 class_num = 2
 
 """
@@ -124,7 +124,7 @@ def to_var(x, volatile=False):
 """
 Main Loop
 """
-num_epochs = 10
+num_epochs = 5
 losses = []
 for epoch in range(num_epochs):
     model.train()
@@ -162,9 +162,9 @@ for epoch in range(num_epochs):
         loss_val = loss_t(outputs, targets)
         predicted = torch.argmax(outputs, 1)
         corrects += torch.sum(predicted == targets)
-        if (k + 1) % 10 == 0:
-            print("Validation,  Step [{},{}] Loss {:.4f}  Acc {:.4f} "
-                  .format(k + 1, len(val_DL), loss_val.item(), 100 * corrects/((k + 1) * bs)))
+
+    print("Validation,  Step [{},{}] Loss {:.4f}  Acc {:.4f} "
+        .format(k + 1, len(val_DL), loss_val.item(), 100 * corrects/(len(val_DL.dataset))))
 
 plt.figure(figsize=(12, 4))
 plt.plot(losses)
@@ -179,6 +179,6 @@ for j, (inputs, targets) in enumerate(test_DL):
     outputs = model(inputs)
     predicted = torch.argmax(outputs, 1)
     corrects += torch.sum(predicted==targets)
-    if (j + 1) % 10 == 0:
-        print("Test,  Step [{},{}] Acc {:.4f} "
-              .format(j + 1, len(test_DL), 100 * corrects / ((j + 1) * bs)))
+
+print("Test,  Step [{},{}] Acc {:.4f} "
+     .format(j + 1, len(test_DL), 100 * corrects / (len(test_DL.dataset))))
