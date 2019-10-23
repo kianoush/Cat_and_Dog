@@ -12,6 +12,7 @@ from torch.autograd import Variable
 import torch.optim as optim
 import cv2
 import matplotlib.pyplot as plt
+from model_utils import *
 
 use_GPU = torch.cuda.is_available()
 print('Cuda', use_GPU)
@@ -63,14 +64,15 @@ train_DL = torch.utils.data.DataLoader(dataset=train_datasets, batch_size=bs, sh
 val_DL = torch.utils.data.DataLoader(dataset=val_datasets, batch_size=bs, shuffle=True)
 test_DL = torch.utils.data.DataLoader(dataset=test_datasets, batch_size=bs, shuffle=True)
 
+
 """
 Model
 """
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
-        self.layer1 = nn.Sequential(nn.Conv2d(3,8,3,1,2),
-                                    nn.BatchNorm2d(8),
+        self.layer1 = nn.Sequential(nn.Conv2d(3,16,5,1,3),
+                                    nn.BatchNorm2d(16),
                                     nn.ReLU(),
                                     nn.MaxPool2d(2,2)
         )
@@ -84,7 +86,7 @@ class SimpleCNN(nn.Module):
                                     nn.ReLU(),
                                     nn.MaxPool2d(2,2)
         )
-        self.fc = nn.Linear(113*113*8, class_num)
+        self.fc = nn.Linear(113*113*16, class_num)
 
     def forward(self, x):
         out1 = self.layer1(x)
@@ -95,8 +97,10 @@ class SimpleCNN(nn.Module):
         return y
 
 
-model = SimpleCNN()
+#model = SimpleCNN()
 
+model = load_pretrained_resnet50(model_path=None, num_classes=2)
+# C:\Users\Kian/.cache\torch\checkpoints\resnet50-19c8e357.pth
 if use_GPU:
     model = model.cuda()
 
@@ -109,12 +113,13 @@ loss_t = nn.CrossEntropyLoss()
 optim
 """
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
 
 def to_var(x, volatile=False):
     if use_GPU:
         x = x.cuda()
     return Variable(x, volatile=volatile)
+
 
 """
 Main Loop
