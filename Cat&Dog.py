@@ -151,34 +151,27 @@ for epoch in range(num_epochs):
             print('Train, Epoch [%2d/%2d], Step [%3d/%3d], Loss: %.4f'
                   % (epoch + 1, num_epochs, i + 1, len(train_DL), loss.data.item()))
 
-    model.eval()
-    corrects = 0
-    for k, (inputs, targets) in enumerate(val_DL):
 
-        inputs = to_var(inputs)
-        targets = to_var(targets)
-
-        outputs = model(inputs)
-        loss_val = loss_t(outputs, targets)
-        predicted = torch.argmax(outputs, 1)
-        corrects += torch.sum(predicted == targets)
-
-    print("Validation,  Step [{},{}] Loss {:.4f}  Acc {:.4f} "
-        .format(k + 1, len(val_DL), loss_val.item(), 100 * corrects/(len(val_DL.dataset))))
 
 plt.figure(figsize=(12, 4))
 plt.plot(losses)
 plt.show()
 
-corrects = 0
-for j, (inputs, targets) in enumerate(test_DL):
 
-    inputs = to_var(inputs)
-    targets = to_var(targets)
+def evaluate_model(model, dataloader, type):
+    model.eval()  # for batch normalization layers
+    corrects = 0
+    for inputs, targets in dataloader:
+        inputs, targets = to_var(inputs, True), to_var(targets, True)
+        outputs = model(inputs)
+        _, preds = torch.max(outputs.data, 1)
+        corrects += (preds == targets.data).sum()
 
-    outputs = model(inputs)
-    predicted = torch.argmax(outputs, 1)
-    corrects += torch.sum(predicted==targets)
+    print('accuracy of {}: {:.2f}'.format(type, 100. * corrects / len(dataloader.dataset)))
 
-print("Test,  Step [{},{}] Acc {:.4f} "
-     .format(j + 1, len(test_DL), 100 * corrects / (len(test_DL.dataset))))
+
+evaluate_model(model, train_DL, 'Train')
+
+evaluate_model(model, val_DL, 'Val')
+
+evaluate_model(model, test_DL, 'Test')
