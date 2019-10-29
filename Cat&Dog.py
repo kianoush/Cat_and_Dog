@@ -37,23 +37,23 @@ class_num = 2
 """
 Load datasets
 """
-train_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/train',
+train_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/train/',
                                                    transform=transforms.Compose([
                                                     transforms.Resize((sz, sz)),
                                                     transforms.RandomHorizontalFlip(),
                                                     transforms.ColorJitter(0.1, 0.1, 0.1, 0.01),
-                                                    transforms.RandomRotation(20),
+                                                    transforms.RandomRotation(30),
                                                     transforms.ToTensor(),
                                                     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                                             ]))
 
-val_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/val', transform=transforms.Compose([
+val_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/val/', transform=transforms.Compose([
                                                                                                         transforms.Resize((sz,sz)),
                                                                                                         transforms.ToTensor(),
                                                                                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ]))
 
-test_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/val', transform=transforms.Compose([
+val_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/test/', transform=transforms.Compose([
                                                                                                         transforms.Resize((sz,sz)),
                                                                                                         transforms.ToTensor(),
                                                                                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -99,7 +99,7 @@ class SimpleCNN(nn.Module):
 
 #model = SimpleCNN()
 
-model = load_pretrained_resnet50(model_path=None, num_classes=2)
+model = load_pretrained_resnet18(model_path=None, num_classes=2)
 # C:\Users\Kian/.cache\torch\checkpoints\resnet50-19c8e357.pth
 if use_GPU:
     model = model.cuda()
@@ -147,7 +147,7 @@ for epoch in range(num_epochs):
         # update parameters
         optimizer.step()
 
-        if (i+1) % 50==0:
+        if (i+1) % 200==0:
             print('Train, Epoch [%2d/%2d], Step [%3d/%3d], Loss: %.4f'
                   % (epoch + 1, num_epochs, i + 1, len(train_DL), loss.data.item()))
 
