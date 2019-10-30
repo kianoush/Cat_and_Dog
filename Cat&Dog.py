@@ -71,7 +71,7 @@ Model
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
-        self.layer1 = nn.Sequential(nn.Conv2d(3,16,5,1,3),
+        self.layer1 = nn.Sequential(nn.Conv2d(3,16,3,1,2),
                                     nn.BatchNorm2d(16),
                                     nn.ReLU(),
                                     nn.MaxPool2d(2,2)
