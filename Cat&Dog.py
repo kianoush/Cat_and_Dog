@@ -32,12 +32,12 @@ Variable
 """
 sz = 224
 bs = 32
-class_num = 2
+class_num = 12
 
 """
 Load datasets
 """
-train_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/train/',
+train_datasets = torchvision.datasets.ImageFolder('D:/pro/data/plant/train/',
                                                    transform=transforms.Compose([
                                                     transforms.Resize((sz, sz)),
                                                     transforms.RandomHorizontalFlip(),
@@ -47,13 +47,13 @@ train_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/train/',
                                                     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                                             ]))
 
-val_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/val/', transform=transforms.Compose([
+val_datasets = torchvision.datasets.ImageFolder('D:/pro/data/plant/val/', transform=transforms.Compose([
                                                                                                         transforms.Resize((sz,sz)),
                                                                                                         transforms.ToTensor(),
                                                                                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ]))
 
-test_datasets = torchvision.datasets.ImageFolder('D:/pro/data/Cat&Dog/test/', transform=transforms.Compose([
+test_datasets = torchvision.datasets.ImageFolder('D:/pro/data/plant/test/', transform=transforms.Compose([
                                                                                                         transforms.Resize((sz,sz)),
                                                                                                         transforms.ToTensor(),
                                                                                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -97,9 +97,9 @@ class SimpleCNN(nn.Module):
         return y
 
 
-#model = SimpleCNN()
+model = SimpleCNN()
 
-model = load_pretrained_resnet18(model_path=None, num_classes=2)
+#model = load_pretrained_resnet18(model_path=None, num_classes=12)
 # C:\Users\Kian/.cache\torch\checkpoints\resnet50-19c8e357.pth
 if use_GPU:
     model = model.cuda()
