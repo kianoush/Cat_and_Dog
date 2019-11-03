@@ -13,6 +13,9 @@ import torch.optim as optim
 import cv2
 import matplotlib.pyplot as plt
 from model_utils import *
+from data_utils import *
+import random
+import os
 
 use_GPU = torch.cuda.is_available()
 print('Cuda', use_GPU)
@@ -31,38 +34,53 @@ if num_of_pic > 0:
 Variable
 """
 sz = 224
-bs = 32
+bs = 8
 class_num = 12
 
 """
 Load datasets
 """
-train_datasets = torchvision.datasets.ImageFolder('D:/pro/data/plant/train/',
-                                                   transform=transforms.Compose([
-                                                    transforms.Resize((sz, sz)),
-                                                    transforms.RandomHorizontalFlip(),
-                                                    transforms.ColorJitter(0.1, 0.1, 0.1, 0.01),
-                                                    transforms.RandomRotation(30),
-                                                    transforms.ToTensor(),
-                                                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-                                            ]))
 
-val_datasets = torchvision.datasets.ImageFolder('D:/pro/data/plant/val/', transform=transforms.Compose([
-                                                                                                        transforms.Resize((sz,sz)),
-                                                                                                        transforms.ToTensor(),
-                                                                                                        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+# make validation dataset
+Data_dir = 'D:/pro/data/Cat&Dog/'
+train_dir = os.path.join(Data_dir + 'train')
+valid_dir = os.path.join(Data_dir + 'valid')
+test_dir = os.path.join(Data_dir + 'test')
+
+if not os.path.exists(valid_dir):
+    create_validation_data(train_dir, valid_dir, split=0.20, ext='jpg')
+
+print("train_dir_list: ",os.listdir(train_dir))
+print("valid_dir_list: ",os.listdir(valid_dir))
+
+zoom = int((1.0 + random.random()/10.0) * sz)
+
+train_transforms = transforms.Compose([
+    transforms.Resize((zoom, zoom)),
+    transforms.RandomCrop(sz),
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(0.1, 0.1, 0.1, 0.01),
+    transforms.RandomRotation(45),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
+
+train_datasets = torchvision.datasets.ImageFolder(train_dir,
+                                                   transform=train_transforms)
+
+val_datasets = torchvision.datasets.ImageFolder(valid_dir, transform=transforms.Compose([
+                                                                            transforms.Resize((sz,sz)),
+                                                                            transforms.ToTensor(),
+                                                                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ]))
 
-test_datasets = torchvision.datasets.ImageFolder('D:/pro/data/plant/test/', transform=transforms.Compose([
-                                                                                                        transforms.Resize((sz,sz)),
-                                                                                                        transforms.ToTensor(),
-                                                                                                        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-]))
+print('size of train_datasets', len(train_datasets))
+print('size of valid_datasets', len(val_datasets))
+
 
 
 train_DL = torch.utils.data.DataLoader(dataset=train_datasets, batch_size=bs, shuffle=True)
 val_DL = torch.utils.data.DataLoader(dataset=val_datasets, batch_size=bs, shuffle=True)
-test_DL = torch.utils.data.DataLoader(dataset=test_datasets, batch_size=bs, shuffle=True)
 
 
 """
@@ -97,9 +115,9 @@ class SimpleCNN(nn.Module):
         return y
 
 
-model = SimpleCNN()
+#model = SimpleCNN()
 
-#model = load_pretrained_resnet18(model_path=None, num_classes=12)
+model = load_pretrained_resnet18(model_path=None, num_classes=12)
 # C:\Users\Kian/.cache\torch\checkpoints\resnet50-19c8e357.pth
 if use_GPU:
     model = model.cuda()
@@ -152,7 +170,6 @@ for epoch in range(num_epochs):
                   % (epoch + 1, num_epochs, i + 1, len(train_DL), loss.data.item()))
 
 
-
 plt.figure(figsize=(12, 4))
 plt.plot(losses)
 plt.show()
@@ -173,5 +190,3 @@ def evaluate_model(model, dataloader, type):
 evaluate_model(model, train_DL, 'Train')
 
 evaluate_model(model, val_DL, 'Val')
-
-evaluate_model(model, test_DL, 'Test')
