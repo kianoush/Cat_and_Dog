@@ -138,6 +138,7 @@ def train_one_epoch(model, dataloder, criterion, optimizer, scheduler):
     running_loss = 0.0
     running_corrects = 0
     losses_trn = []
+
     for i, (inputs, labels) in enumerate(dataloder):
         inputs, labels = to_var(inputs), to_var(labels)
 
@@ -168,7 +169,7 @@ def train_one_epoch(model, dataloder, criterion, optimizer, scheduler):
     sys.stdout.flush()
     print('\r{} Loss: {:.5f} Acc: {:.5f}'.format('  Train', epoch_loss, epoch_acc))
 
-    return model, losses_trn
+    return model, epoch_loss
 
 
 def validate_model(model, dataloder, criterion):
@@ -187,7 +188,7 @@ def validate_model(model, dataloder, criterion):
         outputs = model(inputs)
         _, preds = torch.max(outputs.data, 1)
         loss = criterion(outputs, labels)
-        losses_val += [loss.data.item()]
+
 
         # statistics
         running_loss = (running_loss * i + loss.data.item()) / (i + 1)
@@ -200,7 +201,7 @@ def validate_model(model, dataloder, criterion):
     sys.stdout.flush()
     print('\r{} Loss: {:.5f} Acc: {:.5f}'.format('  Valid', epoch_loss, epoch_acc))
 
-    return epoch_acc, losses_val
+    return epoch_acc, epoch_loss
 
 
 def train_model1(model, train_dl, valid_dl, criterion, optimizer,
@@ -212,7 +213,8 @@ def train_model1(model, train_dl, valid_dl, criterion, optimizer,
 
     best_model_wts = model.state_dict()
     best_acc = 0.0
-
+    losses_val_t = []
+    losses_trn_t = []
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + 1, num_epochs))
         print('-' * 10)
@@ -220,6 +222,9 @@ def train_model1(model, train_dl, valid_dl, criterion, optimizer,
         ## train and validate
         model, losses_trn = train_one_epoch(model, train_dl, criterion, optimizer, scheduler)
         val_acc, losses_val = validate_model(model, valid_dl, criterion)
+
+        losses_val_t += [losses_val]
+        losses_trn_t += [losses_trn]
 
         # deep copy the model
         if val_acc > best_acc:
@@ -235,18 +240,17 @@ def train_model1(model, train_dl, valid_dl, criterion, optimizer,
 
     # load best model weights
     model.load_state_dict(best_model_wts)
-    return model, losses_trn, losses_val
+    return model, losses_trn_t, losses_val_t
 
 
 """
 Main Loop
 """
-num_epochs = 10
-losses = []
 
     # create model
-model = SimpleCNN()
-#model = load_pretrained_resnet18(model_path=None, num_classes=2)
+
+#model = SimpleCNN()
+model = load_pretrained_resnet18(model_path=None, num_classes=2)
 if use_gpu:
     model = model.cuda()
 
@@ -255,11 +259,11 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.002, momentum=0.9)
 
 # train
-model, losses_trn, losses_val = train_model1(model, train_DL, val_DL, criterion,optimizer, num_epochs=10)
+model, losses_trn_t, losses_val_t = train_model1(model, train_DL, val_DL, criterion,optimizer, num_epochs=10)
 
 plt.figure(figsize=(12, 4))
-plt.plot(losses_trn)
-plt.plot(losses_val)
+plt.plot(losses_trn_t)
+plt.plot(losses_val_t)
 plt.show()
 
 
