@@ -16,6 +16,9 @@ from model_utils import *
 from data_utils import *
 import random
 import os
+import sys
+import time
+
 
 use_GPU = torch.cuda.is_available()
 print('Cuda', use_GPU)
@@ -35,7 +38,7 @@ Variable
 """
 sz = 224
 bs = 8
-class_num = 12
+class_num = 2
 
 """
 Load datasets
@@ -104,89 +107,160 @@ class SimpleCNN(nn.Module):
                                     nn.ReLU(),
                                     nn.MaxPool2d(2,2)
         )
-        self.fc = nn.Linear(113*113*16, class_num)
+        self.fc = nn.Linear(29*29*64, class_num)
 
     def forward(self, x):
         out1 = self.layer1(x)
-        #out2 = self.layer2(out1)
-        #out3 = self.layer3(out2)
-        out1 = out1.reshape(out1.size(0), -1)
-        y = self.fc(out1)
+        out2 = self.layer2(out1)
+        out3 = self.layer3(out2)
+        out3 = out3.reshape(out3.size(0), -1)
+        y = self.fc(out3)
         return y
 
 
-#model = SimpleCNN()
-
-model = load_pretrained_resnet18(model_path=None, num_classes=12)
-# C:\Users\Kian/.cache\torch\checkpoints\resnet50-19c8e357.pth
-if use_GPU:
-    model = model.cuda()
-
 """
-Loss
+define train
 """
-loss_t = nn.CrossEntropyLoss()
-
-"""
-optim
-"""
-optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
-
 def to_var(x, volatile=False):
     if use_GPU:
         x = x.cuda()
     return Variable(x, volatile=volatile)
 
 
-"""
-Main Loop
-"""
-num_epochs = 5
-losses = []
-for epoch in range(num_epochs):
-    model.train()
-    for i, (inputs, targets) in enumerate(train_DL):
+def train_one_epoch(model, dataloder, criterion, optimizer, scheduler):
+    if scheduler is not None:
+        scheduler.step()
 
-        inputs = to_var(inputs)
-        targets = to_var(targets)
+    model.train(True)
+
+    steps = len(dataloder.dataset) // dataloder.batch_size
+
+    running_loss = 0.0
+    running_corrects = 0
+    losses_trn = []
+    for i, (inputs, labels) in enumerate(dataloder):
+        inputs, labels = to_var(inputs), to_var(labels)
+
+        optimizer.zero_grad()
 
         # forward
-        optimizer.zero_grad()
         outputs = model(inputs)
+        _, preds = torch.max(outputs.data, 1)
+        loss = criterion(outputs, labels)
+        losses_trn += [loss.data.item()]
 
-        # Loss
-        loss = loss_t(outputs, targets)
-        losses +=[loss.data.item()]
-
-        # backward pass
+        # backward
         loss.backward()
 
         # update parameters
         optimizer.step()
 
-        if (i+1) % 200==0:
-            print('Train, Epoch [%2d/%2d], Step [%3d/%3d], Loss: %.4f'
-                  % (epoch + 1, num_epochs, i + 1, len(train_DL), loss.data.item()))
+        # statistics
 
+        running_loss = (running_loss * i + loss.data.item()) / (i + 1)
+
+        running_corrects += torch.sum(preds == labels.data)
+        sys.stdout.flush()
+        sys.stdout.write("\r  Step %d/%d | Loss: %.5f" % (i, steps, loss.data.item()))
+
+    epoch_loss = running_loss
+    epoch_acc = running_corrects.data.item() / len(dataloder.dataset)
+    sys.stdout.flush()
+    print('\r{} Loss: {:.5f} Acc: {:.5f}'.format('  Train', epoch_loss, epoch_acc))
+
+    return model, losses_trn
+
+
+def validate_model(model, dataloder, criterion):
+    model.train(False)
+
+    steps = len(dataloder.dataset) // dataloder.batch_size
+
+    running_loss = 0.0
+    running_corrects = 0
+    losses_val = []
+
+    for i, (inputs, labels) in enumerate(dataloder):
+        inputs, labels = to_var(inputs, True), to_var(labels, True)
+
+        # forward
+        outputs = model(inputs)
+        _, preds = torch.max(outputs.data, 1)
+        loss = criterion(outputs, labels)
+        losses_val += [loss.data.item()]
+
+        # statistics
+        running_loss = (running_loss * i + loss.data.item()) / (i + 1)
+        running_corrects += torch.sum(preds == labels.data)
+        sys.stdout.flush()
+        sys.stdout.write("\r  Step %d/%d | Loss: %.5f" % (i, steps, loss.data.item()))
+
+    epoch_loss = running_loss
+    epoch_acc = running_corrects.data.item() / len(dataloder.dataset)
+    sys.stdout.flush()
+    print('\r{} Loss: {:.5f} Acc: {:.5f}'.format('  Valid', epoch_loss, epoch_acc))
+
+    return epoch_acc, losses_val
+
+
+def train_model1(model, train_dl, valid_dl, criterion, optimizer,
+                 scheduler=None, num_epochs=10):
+    if not os.path.exists('models'):
+        os.mkdir('models')
+
+    since = time.time()
+
+    best_model_wts = model.state_dict()
+    best_acc = 0.0
+
+    for epoch in range(num_epochs):
+        print('Epoch {}/{}'.format(epoch + 1, num_epochs))
+        print('-' * 10)
+
+        ## train and validate
+        model, losses_trn = train_one_epoch(model, train_dl, criterion, optimizer, scheduler)
+        val_acc, losses_val = validate_model(model, valid_dl, criterion)
+
+        # deep copy the model
+        if val_acc > best_acc:
+            best_acc = val_acc
+            best_model_wts = model.state_dict().copy()
+            torch.save(best_model_wts, "./models/epoch-{}-acc-{:.5f}.pth".format(epoch, best_acc))
+
+        print()
+
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+    print('Best val Acc: {:.4f}'.format(best_acc))
+
+    # load best model weights
+    model.load_state_dict(best_model_wts)
+    return model, losses_trn, losses_val
+
+
+"""
+Main Loop
+"""
+num_epochs = 10
+losses = []
+
+    # create model
+model = SimpleCNN()
+#model = load_pretrained_resnet18(model_path=None, num_classes=2)
+if use_gpu:
+    model = model.cuda()
+
+# loss and optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(model.parameters(), lr=0.002, momentum=0.9)
+
+# train
+model, losses_trn, losses_val = train_model1(model, train_DL, val_DL, criterion,optimizer, num_epochs=10)
 
 plt.figure(figsize=(12, 4))
-plt.plot(losses)
+plt.plot(losses_trn)
+plt.plot(losses_val)
 plt.show()
 
 
-def evaluate_model(model, dataloader, type):
-    model.eval()  # for batch normalization layers
-    corrects = 0
-    for inputs, targets in dataloader:
-        inputs, targets = to_var(inputs, True), to_var(targets, True)
-        outputs = model(inputs)
-        _, preds = torch.max(outputs.data, 1)
-        corrects += (preds == targets.data).sum()
 
-    print('accuracy of {}: {:.2f}'.format(type, 100. * corrects / len(dataloader.dataset)))
-
-
-evaluate_model(model, train_DL, 'Train')
-
-evaluate_model(model, val_DL, 'Val')
