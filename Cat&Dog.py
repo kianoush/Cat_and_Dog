@@ -250,7 +250,7 @@ Main Loop
     # create model
 
 #model = SimpleCNN()
-model = load_pretrained_resnet18(model_path=None, num_classes=2)
+model = load_pretrained_resnet50(model_path=None, num_classes=2)
 if use_gpu:
     model = model.cuda()
 
