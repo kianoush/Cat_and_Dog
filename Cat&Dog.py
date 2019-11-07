@@ -56,7 +56,7 @@ if not os.path.exists(valid_dir):
 print("train_dir_list: ",os.listdir(train_dir))
 print("valid_dir_list: ",os.listdir(valid_dir))
 
-zoom = int((1.0 + random.random()/10.0) * sz)
+zoom = int((.8 + random.random()/10.0) * sz)
 
 train_transforms = transforms.Compose([
     transforms.Resize((zoom, zoom)),
@@ -121,6 +121,7 @@ class SimpleCNN(nn.Module):
 """
 define train
 """
+
 def to_var(x, volatile=False):
     if use_GPU:
         x = x.cuda()
